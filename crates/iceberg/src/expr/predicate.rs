@@ -21,6 +21,7 @@
 
 use crate::expr::{BoundReference, PredicateOperator, UnboundReference};
 use crate::spec::Datum;
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Not;
@@ -99,6 +100,24 @@ pub struct SetExpression<T: Debug> {
     term: T,
     /// Literals of this predicate, for example, `(1, 2, 3)` in `a in (1, 2, 3)`.
     literals: HashSet<Datum>,
+}
+
+impl<T: Debug> SetExpression<T> {
+    pub(crate) fn new(op: PredicateOperator, term: T, literals: HashSet<Datum>) -> Self {
+        Self { op, term, literals }
+    }
+}
+
+impl<T: Display + Debug> Display for SetExpression<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} ({})",
+            self.term,
+            self.op,
+            self.literals.iter().join(", ")
+        )
+    }
 }
 
 /// Unbound predicate expression before binding to a schema.
@@ -194,6 +213,68 @@ impl UnboundPredicate {
     /// ```
     pub fn or(self, other: UnboundPredicate) -> UnboundPredicate {
         UnboundPredicate::Or(LogicalExpression::new([Box::new(self), Box::new(other)]))
+    }
+
+    /// Returns a predicate representing the negation ('NOT') of this one,
+    /// by using inverse predicates rather than wrapping in a `NOT`.
+    /// Used for `NOT` elimination.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use std::ops::Bound::Unbounded;
+    /// use iceberg::expr::BoundPredicate::Unary;
+    /// use iceberg::expr::{LogicalExpression, UnboundPredicate, UnboundReference};
+    /// use iceberg::spec::Datum;
+    /// let expr1 = UnboundReference::new("a").less_than(Datum::long(10));
+    /// let expr2 = UnboundReference::new("b").less_than(Datum::long(5)).and(UnboundReference::new("c").less_than(Datum::long(10)));
+    ///
+    /// let result = expr1.negate();
+    /// assert_eq!(&format!("{result}"), "a >= 10");
+    ///
+    /// let result = expr2.negate();
+    /// assert_eq!(&format!("{result}"), "(b >= 5) OR (c >= 10)");
+    /// ```
+    /// Returns a predicate representing the negation ('NOT') of this one,
+    /// by using inverse predicates rather than wrapping in a `NOT`.
+    /// Used for `NOT` elimination.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use std::ops::Bound::Unbounded;
+    /// use iceberg::expr::BoundPredicate::Unary;
+    /// use iceberg::expr::{LogicalExpression, UnboundPredicate, UnboundReference};
+    /// use iceberg::spec::Datum;
+    /// let expr1 = UnboundReference::new("a").less_than(Datum::long(10));
+    /// let expr2 = UnboundReference::new("b").less_than(Datum::long(5)).and(UnboundReference::new("c").less_than(Datum::long(10)));
+    ///
+    /// let result = expr1.negate();
+    /// assert_eq!(&format!("{result}"), "a >= 10");
+    ///
+    /// let result = expr2.negate();
+    /// assert_eq!(&format!("{result}"), "(b >= 5) OR (c >= 10)");
+    /// ```
+    pub fn negate(self) -> UnboundPredicate {
+        match self {
+            UnboundPredicate::And(expr) => UnboundPredicate::Or(LogicalExpression::new(
+                expr.inputs.map(|expr| Box::new(expr.negate())),
+            )),
+            UnboundPredicate::Or(expr) => UnboundPredicate::And(LogicalExpression::new(
+                expr.inputs.map(|expr| Box::new(expr.negate())),
+            )),
+            UnboundPredicate::Not(expr) => {
+                let LogicalExpression { inputs: [input_0] } = expr;
+                input_0.negate()
+            }
+            UnboundPredicate::Unary(expr) => UnboundPredicate::Unary(UnaryExpression::new(expr.op.negate(), expr.term)),
+            UnboundPredicate::Binary(expr) => {
+                UnboundPredicate::Binary(BinaryExpression::new(expr.op.negate(), expr.term, expr.literal))
+            }
+            UnboundPredicate::Set(expr) => {
+                UnboundPredicate::Set(SetExpression::new(expr.op.negate(), expr.term, expr.literals))
+            }
+        }
     }
 }
 

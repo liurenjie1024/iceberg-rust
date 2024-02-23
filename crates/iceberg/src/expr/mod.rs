@@ -64,3 +64,26 @@ impl Display for PredicateOperator {
         }
     }
 }
+
+impl PredicateOperator {
+
+    /// Returns the predicate that is the inverse of self
+    pub fn negate(self) -> PredicateOperator {
+        match self {
+            PredicateOperator::IsNull => PredicateOperator::NotNull,
+            PredicateOperator::NotNull => PredicateOperator::IsNull,
+            PredicateOperator::IsNan => PredicateOperator::NotNan,
+            PredicateOperator::NotNan => PredicateOperator::IsNan,
+            PredicateOperator::LessThan => PredicateOperator::GreaterThanOrEq,
+            PredicateOperator::LessThanOrEq => PredicateOperator::GreaterThan,
+            PredicateOperator::GreaterThan => PredicateOperator::LessThanOrEq,
+            PredicateOperator::GreaterThanOrEq => PredicateOperator::LessThan,
+            PredicateOperator::Eq => PredicateOperator::NotEq,
+            PredicateOperator::NotEq => PredicateOperator::Eq,
+            PredicateOperator::In => PredicateOperator::NotIn,
+            PredicateOperator::NotIn => PredicateOperator::In,
+            PredicateOperator::StartsWith => PredicateOperator::NotStartsWith,
+            PredicateOperator::NotStartsWith => PredicateOperator::StartsWith,
+        }
+    }
+}
