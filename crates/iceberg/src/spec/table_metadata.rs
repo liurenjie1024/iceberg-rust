@@ -32,6 +32,8 @@ use super::{
 
 use _serde::TableMetadataEnum;
 
+use crate::error::Result;
+use crate::{Error, ErrorKind, TableCreation};
 use chrono::{DateTime, TimeZone, Utc};
 
 static MAIN_BRANCH: &str = "main";
@@ -272,6 +274,59 @@ impl TableMetadata {
         self.snapshot_log.push(snapshot.log());
         self.snapshots
             .insert(snapshot.snapshot_id(), Arc::new(snapshot));
+    }
+}
+
+/// Manipulating table metadata.
+pub struct TableMetadataBuilder(TableMetadata);
+
+impl TableMetadataBuilder {
+    /// Creates a new table metadata builder from the given table metadata.
+    pub fn new(origin: TableMetadata) -> Self {
+        Self(origin)
+    }
+
+    /// Creates a new table metadata builder from the given table creation.
+    pub fn from_table_creation(table_creation: TableCreation) -> Result<Self> {
+        let table_metadata = TableMetadata {
+            format_version: FormatVersion::V2,
+            table_uuid: Uuid::new_v4(),
+            location: table_creation.location.ok_or_else(|| {
+                Error::new(
+                    ErrorKind::DataInvalid,
+                    "Can't create table without location",
+                )
+            })?,
+            last_sequence_number: 0,
+            last_updated_ms: 0,
+            last_column_id: 0,
+            schemas: table_creation.schema,
+            current_schema_id: 0,
+            partition_specs: Default::default(),
+            default_spec_id: 0,
+            last_partition_id: 0,
+            properties: Default::default(),
+            current_snapshot_id: None,
+            snapshots: Default::default(),
+            snapshot_log: vec![],
+            metadata_log: vec![],
+            sort_orders: Default::default(),
+            default_sort_order_id: 0,
+            refs: Default::default(),
+        };
+
+        Ok(Self(table_metadata))
+    }
+
+    /// Changes uuid of table metadata.
+    pub fn assign_uuid(mut self, uuid: Uuid) -> Result<Self> {
+        self.0.table_uuid = uuid;
+        Ok(self)
+    }
+
+    /// Returns the new table metadata after changes.
+    pub fn build(self) -> Result<TableMetadata> {
+        Ok(self.0)
     }
 }
 

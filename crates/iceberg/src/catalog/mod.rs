@@ -18,7 +18,8 @@
 //! Catalog API for Apache Iceberg
 
 use crate::spec::{
-    FormatVersion, Schema, Snapshot, SnapshotReference, SortOrder, UnboundPartitionSpec,
+    FormatVersion, Schema, Snapshot, SnapshotReference, SortOrder, TableMetadataBuilder,
+    UnboundPartitionSpec,
 };
 use crate::table::Table;
 use crate::{Error, ErrorKind, Result};
@@ -425,6 +426,16 @@ pub enum TableUpdate {
         /// Properties to remove
         removals: Vec<String>,
     },
+}
+
+impl TableUpdate {
+    /// Applies the update to the table metadata builder.
+    fn apply(self, builder: TableMetadataBuilder) -> Result<TableMetadataBuilder> {
+        match self {
+            TableUpdate::AssignUuid { uuid } => builder.assign_uuid(uuid),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[cfg(test)]
