@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::iter::empty;
 use crate::expr::{BoundPredicate, BoundReference, PredicateOperator};
 use crate::spec::Datum;
 use crate::Result;
@@ -49,12 +50,11 @@ pub trait BoundPredicateVisitor {
     /// or SetPredicate. Passes the predicate's operator in all cases,
     /// as well as the term and literals in the case of binary and aet
     /// predicates.
-    fn op(
+    fn op<'a, I: Iterator<Item = &'a Datum>>(
         &mut self,
         op: PredicateOperator,
         reference: &BoundReference,
-        literal: Option<OpLiteral>,
-        predicate: &BoundPredicate,
+        literals: I,
     ) -> Result<Self::T>;
 }
 
@@ -90,18 +90,16 @@ pub(crate) fn visit<V: BoundPredicateVisitor>(
 
             visitor.not(inner_result)
         }
-        BoundPredicate::Unary(expr) => visitor.op(expr.op(), expr.term(), None, predicate),
+        BoundPredicate::Unary(expr) => visitor.op(expr.op(), expr.term(), empty()),
         BoundPredicate::Binary(expr) => visitor.op(
             expr.op(),
             expr.term(),
-            Some(OpLiteral::Single(expr.literal())),
-            predicate,
+            [expr.literal(); 1].into_iter(),
         ),
         BoundPredicate::Set(expr) => visitor.op(
             expr.op(),
             expr.term(),
-            Some(OpLiteral::Set(expr.literals())),
-            predicate,
+            expr.literals().iter(),
         ),
     }
 }
@@ -141,12 +139,11 @@ mod tests {
             Ok(!inner)
         }
 
-        fn op(
+        fn op<'a, I: Iterator<Item=&'a Datum>>(
             &mut self,
             op: PredicateOperator,
             _reference: &BoundReference,
-            _literal: Option<OpLiteral>,
-            _predicate: &BoundPredicate,
+            literal: I
         ) -> crate::Result<Self::T> {
             Ok(match op {
                 PredicateOperator::IsNull => true,
