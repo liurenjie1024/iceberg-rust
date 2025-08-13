@@ -16,6 +16,7 @@
 // under the License.
 
 mod datafusion;
+mod spark;
 
 use std::path::Path;
 

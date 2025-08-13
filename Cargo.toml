@@ -106,6 +106,7 @@ serde_derive = "1.0.210"
 serde_json = "1.0.138"
 serde_repr = "0.1.16"
 serde_with = "3.4"
+spark-connect-rs = { git= "https://github.com/apache/spark-connect-rust.git" }
 sqllogictest = "0.28"
 stacker = "0.1.20"
 strum = "0.27"
